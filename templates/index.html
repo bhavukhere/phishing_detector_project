@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Email Phishing Detector</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="theme-toggle">
+    <label class="switch">
+      <input type="checkbox" id="theme-toggle" />
+      <span class="slider"></span>
+    </label>
+    <span class="theme-label">Dark Mode</span>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h1>🚨 Phishing Email Detector</h1>
+      <form id="email-form">
+        <input type="email" id="sender-email" placeholder="Sender's Email (e.g. sbibank@gmail.com)" required />
+        <textarea id="email-content" placeholder="Paste the email content here..." required></textarea>
+        <button type="submit" class="btn-analyze">Analyze Email</button>
+        <div id="button-container"></div>
+      </form>
+
+      <div id="result"></div>
+      <div id="highlighted-content"></div>
+      <div id="breakdown-div"></div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
