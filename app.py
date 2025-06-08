@@ -1,8 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import re
-from language_tool_python import LanguageToolPublicAPI
-
-
+import requests
 
 app = Flask(__name__)
 
@@ -76,6 +74,27 @@ def is_phishing(email_text, sender_email):
     else:
         return {"phishing": False, "message": "✅ This email seems safe.", "breakdown": breakdown}
 
+def grammar_check(text):
+    url = "https://api.languagetool.org/v2/check"
+    data = {
+        "text": text,
+        "language": "en-US"
+    }
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+
+    results = []
+    matches = response.json().get("matches", [])
+    for match in matches:
+        results.append({
+            "message": match.get("message"),
+            "suggestions": [r["value"] for r in match.get("replacements", [])][:3],
+            "offset": match.get("offset"),
+            "length": match.get("length"),
+            "context": text[match.get("offset"):match.get("offset") + match.get("length")]
+        })
+    return results
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -85,26 +104,15 @@ def check_email():
     data = request.get_json()
     email_content = data.get('email_content', '')
     sender_email = data.get('sender_email', '')
-    
-    # Phishing check
+
     result = is_phishing(email_content, sender_email)
 
-    # Grammar and spelling check with offsets and length for highlighting
-    tool = LanguageToolPublicAPI('en-US')
+    try:
+        result["grammar_issues"] = grammar_check(email_content)
+    except Exception as e:
+        result["grammar_issues"] = []
+        result["grammar_error"] = str(e)
 
-
-    matches = tool.check(email_content)
-    grammar_issues = []
-    for match in matches:
-        grammar_issues.append({
-            "message": match.message,
-            "suggestions": match.replacements[:3],
-            "offset": match.offset,
-            "length": match.errorLength,
-            "context": email_content[match.offset:match.offset + match.errorLength]
-        })
-
-    result["grammar_issues"] = grammar_issues
     return jsonify(result)
 
 if __name__ == '__main__':
