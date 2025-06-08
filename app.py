@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 import re
+import language_tool_python
 
 app = Flask(__name__)
 
-# Suspicious keywords to detect in email body
+# Suspicious indicators
 SUSPICIOUS_KEYWORDS = [
     "verify your account", "click here", "login immediately", "urgent action",
     "update your password", "account suspended", "unauthorized login", "security alert",
@@ -28,25 +29,21 @@ def domain_is_suspicious(sender_email, breakdown):
     domain = sender_email.split('@')[-1].lower()
     name = sender_email.split('@')[0].lower()
 
-    # Check blacklist exact match
     if domain in blacklisted_domains:
         breakdown.append("❌ Blacklisted domain detected")
         return True
 
-    # Brand + free domain heuristic
     for brand in BRAND_NAMES:
         if brand in name and domain in FREE_EMAIL_DOMAINS:
             breakdown.append("⚠️ Brand name with free email domain")
             return True
 
-    # Generic suspicious keywords with free domain
     if domain in FREE_EMAIL_DOMAINS:
         for keyword in GENERIC_SUSPICIOUS_KEYWORDS:
             if keyword in name:
                 breakdown.append("⚠️ Generic suspicious keyword with free domain")
                 return True
 
-    # Suspicious TLDs check
     for tld in SUSPICIOUS_TLDS:
         if domain.endswith(tld):
             breakdown.append("⚠️ Suspicious domain extension")
@@ -58,22 +55,18 @@ def is_phishing(email_text, sender_email):
     score = 0
     breakdown = []
 
-    # Check suspicious keywords in email text
     for keyword in SUSPICIOUS_KEYWORDS:
         if keyword in email_text.lower():
             score += 1
-            breakdown.append(f"Suspicious keyword found: \"{keyword}\"")
+            breakdown.append(f'Suspicious keyword found: "{keyword}"')
 
-    # Check for suspicious URLs
     if re.search(r'https?://[^\s]+', email_text.lower()):
         score += 1
-        breakdown.append("Suspicious URL detected")
+        breakdown.append("URL detected, might be suspicious")
 
-    # Check domain heuristics
     if domain_is_suspicious(sender_email, breakdown):
         score += 1
 
-    # Final classification
     if score >= 3:
         return {"phishing": True, "message": "⚠️ This looks like a phishing email.", "breakdown": breakdown}
     elif score == 2:
@@ -90,7 +83,24 @@ def check_email():
     data = request.get_json()
     email_content = data.get('email_content', '')
     sender_email = data.get('sender_email', '')
+    
+    # Phishing check
     result = is_phishing(email_content, sender_email)
+
+    # Grammar and spelling check with offsets and length for highlighting
+    tool = language_tool_python.LanguageTool('en-US')
+    matches = tool.check(email_content)
+    grammar_issues = []
+    for match in matches:
+        grammar_issues.append({
+            "message": match.message,
+            "suggestions": match.replacements[:3],
+            "offset": match.offset,
+            "length": match.errorLength,
+            "context": email_content[match.offset:match.offset + match.errorLength]
+        })
+
+    result["grammar_issues"] = grammar_issues
     return jsonify(result)
 
 if __name__ == '__main__':
