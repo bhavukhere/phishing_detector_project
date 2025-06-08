@@ -88,7 +88,9 @@ def check_email():
     result = is_phishing(email_content, sender_email)
 
     # Grammar and spelling check with offsets and length for highlighting
-    tool = language_tool_python.LanguageTool('en-US')
+    from language_tool_python import LanguageToolRemote
+    tool = LanguageToolRemote('https://api.languagetool.org/')
+
     matches = tool.check(email_content)
     grammar_issues = []
     for match in matches:
