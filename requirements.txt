@@ -7,8 +7,6 @@ Flask==3.1.1
 idna==3.10
 itsdangerous==2.2.0
 Jinja2==3.1.6
-pip install language-tool-python==2.7.1
-pip freeze > requirements.txt
 MarkupSafe==3.0.2
 psutil==7.0.0
 requests==2.32.3
