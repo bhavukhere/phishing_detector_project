@@ -249,3 +249,23 @@ body.dark #highlighted-content {
 body.dark .theme-toggle {
   color: #ccc;
 }
+
+
+#grammar-issues {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #444;
+  background-color: #fffde7;
+  padding: 10px 16px;
+  border-left: 4px solid #ffca28;
+  border-radius: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.highlight-info {
+  background-color: #81d4fa;
+  font-weight: normal;
+  position: relative;
+  cursor: help;
+}
