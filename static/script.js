@@ -44,25 +44,78 @@ document.addEventListener("DOMContentLoaded", () => {
     return emailRegex.test(email);
   }
 
-  // Highlight suspicious keywords and URLs
-  function highlightContent(text) {
-    let highlighted = text;
+  // Escape HTML entities
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;")
+               .replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;");
+  }
 
-    // Escape HTML entities
-    highlighted = highlighted.replace(/&/g, "&amp;")
-                             .replace(/</g, "&lt;")
-                             .replace(/>/g, "&gt;");
+  // Highlight suspicious keywords and URLs inside text (non-overlapping, outside HTML tags)
+  function highlightSuspicious(text) {
+    let highlighted = text;
 
     keywords.forEach(keyword => {
       const regex = new RegExp(`(${keyword})`, "gi");
       highlighted = highlighted.replace(regex, '<span class="highlight-danger">$1</span>');
     });
 
-    // Highlight URLs
     const urlRegex = /(https?:\/\/[^\s]+)/gi;
     highlighted = highlighted.replace(urlRegex, '<span class="highlight-danger">$1</span>');
 
     return highlighted;
+  }
+
+  // Highlight grammar issues by wrapping the error substring with a span
+  // Combine with suspicious keywords highlight
+  function highlightContent(text, grammarIssues) {
+    // Escape HTML first
+    let escapedText = escapeHtml(text);
+
+    // We'll store markers for opening and closing spans
+    const opens = {};
+    const closes = {};
+
+    // Mark grammar issues positions
+    grammarIssues.forEach(issue => {
+      // Because the text is escaped, offset still works since no chars added before offset
+      if (!opens[issue.offset]) opens[issue.offset] = [];
+      opens[issue.offset].push('<span class="highlight-grammar">');
+
+      const closePos = issue.offset + issue.length;
+      if (!closes[closePos]) closes[closePos] = [];
+      closes[closePos].push('</span>');
+    });
+
+    // Build highlighted string with grammar spans inserted
+    let result = "";
+    for (let i = 0; i < escapedText.length; i++) {
+      if (opens[i]) {
+        result += opens[i].join('');
+      }
+      result += escapedText[i];
+      if (closes[i + 1]) {
+        result += closes[i + 1].join('');
+      }
+    }
+
+    // Now highlight suspicious keywords and URLs in the resulting string but avoid HTML tags
+    // Helper to highlight only outside HTML tags
+    function highlightOutsideTags(str, regex, className) {
+      return str.split(/(<[^>]+>)/g).map(part => {
+        if (part.startsWith("<")) return part; // skip tags
+        return part.replace(regex, `<span class="${className}">$1</span>`);
+      }).join("");
+    }
+
+    // Highlight suspicious keywords
+    const keywordsPattern = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join("|");
+    result = highlightOutsideTags(result, new RegExp(`(${keywordsPattern})`, "gi"), "highlight-danger");
+
+    // Highlight URLs
+    result = highlightOutsideTags(result, /(https?:\/\/[^\s]+)/gi, "highlight-danger");
+
+    return result;
   }
 
   // Form submit handler
@@ -75,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
     resultDiv.textContent = "";
     highlightedContentDiv.innerHTML = "";
     breakdownDiv.innerHTML = "";
+    document.getElementById("grammar-issues").innerHTML = "";
 
     if (!isValidEmail(senderEmail)) {
       resultDiv.style.color = "red";
@@ -101,24 +155,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const data = await response.json();
 
-      if (data.phishing === true) {
-        resultDiv.style.color = "red";
-      } else if (data.phishing === false) {
-        resultDiv.style.color = "green";
-      } else {
-        resultDiv.style.color = "blue";
-      }
+      resultDiv.style.color = data.phishing === true ? "red" :
+                              data.phishing === false ? "green" : "blue";
       resultDiv.textContent = data.message;
 
-      const highlighted = highlightContent(emailContent);
-      highlightedContentDiv.innerHTML = highlighted;
+      // Highlight content with grammar and suspicious highlights
+      highlightedContentDiv.innerHTML = highlightContent(emailContent, data.grammar_issues || []);
 
       if (data.breakdown && data.breakdown.length) {
         breakdownDiv.innerHTML = "<strong>Analysis details:</strong><ul>" +
           data.breakdown.map(item => `<li>${item}</li>`).join('') +
           "</ul>";
-      } else {
-        breakdownDiv.innerHTML = "";
+      }
+
+      if (data.grammar_issues && data.grammar_issues.length) {
+        const grammarDiv = document.getElementById("grammar-issues");
+        grammarDiv.innerHTML = "<strong>Grammar/Spelling Suggestions:</strong><ul>" +
+          data.grammar_issues.map(issue =>
+            `<li>${issue.message}` +
+            (issue.suggestions.length ? ` (Suggestions: ${issue.suggestions.join(', ')})` : '') +
+            `</li>`
+          ).join('') +
+          "</ul>";
       }
     } catch (err) {
       resultDiv.style.color = "red";
@@ -138,6 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     resultDiv.textContent = "";
     highlightedContentDiv.innerHTML = "";
     breakdownDiv.innerHTML = "";
+    document.getElementById("grammar-issues").innerHTML = "";
   });
 
   // Copy button
