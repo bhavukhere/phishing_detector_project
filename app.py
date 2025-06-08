@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import re
-import language_tool_python
+from language_tool_python import LanguageToolPublicAPI
+
+
 
 app = Flask(__name__)
 
@@ -88,8 +90,8 @@ def check_email():
     result = is_phishing(email_content, sender_email)
 
     # Grammar and spelling check with offsets and length for highlighting
-    from language_tool_python import LanguageToolRemote
-    tool = LanguageToolRemote('https://api.languagetool.org/')
+    tool = LanguageToolPublicAPI('en-US')
+
 
     matches = tool.check(email_content)
     grammar_issues = []
